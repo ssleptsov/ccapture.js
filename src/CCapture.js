@@ -267,6 +267,46 @@ CCJPEGEncoder.prototype.add = function( canvas ) {
 
 }
 
+/**
+ * Custom Encoder to capture an array of JPEG image blobs
+ *
+ * @param settings
+ * @constructor
+ */
+ function CCJPEGBlobEncoder( settings ) {
+  CCFrameEncoder.call( this, settings );
+
+	this.type = 'image/jpeg';
+	this.fileExtension = '.jpg';
+	this.quality = ( settings.quality / 100 ) || .8;
+	this.frames = [];
+	this.callback = settings.callback || function(){};
+}
+
+CCJPEGBlobEncoder.prototype = Object.create( CCFrameEncoder.prototype );
+
+CCJPEGBlobEncoder.prototype.start = function (){
+  this.frames = [];
+};
+
+/*CCJPEGBlobEncoder.prototype.stop = function (){
+  //this.frames = [];
+};*/
+
+CCJPEGBlobEncoder.prototype.add = function ( canvas ) {
+	canvas.toBlob( function( blob ) {
+    this.callback(blob);
+    this.frames.push(blob);
+    this.step();
+	}.bind(this), this.type, this.quality);
+}
+
+CCJPEGBlobEncoder.prototype.save = function( callback ) {
+  if( !this.frames.length ) return;
+
+  callback( this.frames );
+}
+
 /*
 
 	WebM Encoder
@@ -633,6 +673,7 @@ function CCapture( settings ) {
 		ffmpegserver: CCFFMpegServerEncoder,
 		png: CCPNGEncoder,
 		jpg: CCJPEGEncoder,
+		'jpg-blob': CCJPEGBlobEncoder,
 		'webm-mediarecorder': CCStreamEncoder
     };
 
@@ -795,10 +836,14 @@ function CCapture( settings ) {
 		}
 		var d = new Date( null );
 		d.setSeconds( seconds );
+		var secondsValue = d.toISOString().substr( 11, 8 );
 		if( _settings.motionBlurFrames > 2 ) {
-			_timeDisplay.textContent = 'CCapture ' + _settings.format + ' | ' + _frameCount + ' frames (' + _intermediateFrameCount + ' inter) | ' +  d.toISOString().substr( 11, 8 );
+			_timeDisplay.textContent = 'CCapture ' + _settings.format + ' | ' + _frameCount + ' frames (' + _intermediateFrameCount + ' inter) | ' +  secondsValue;
 		} else {
-			_timeDisplay.textContent = 'CCapture ' + _settings.format + ' | ' + _frameCount + ' frames | ' +  d.toISOString().substr( 11, 8 );
+			_timeDisplay.textContent = 'CCapture ' + _settings.format + ' | ' + _frameCount + ' frames | ' +  secondsValue;
+		}
+		if (_settings.onUpdateTime){
+			_settings.onUpdateTime({ seconds: secondsValue, frameCount: _frameCount});
 		}
 	}
 
@@ -918,12 +963,17 @@ function CCapture( settings ) {
 
 	function _save( callback ) {
 
-		if( !callback ) {
+		if (_encoder.settings.onSave){
+			callback = _encoder.settings.onSave;
+		}
+
+		if( !callback && !_encoder.settings.onSave) {
 			callback = function( blob ) {
 				download( blob, _encoder.filename + _encoder.extension, _encoder.mimeType );
 				return false;
 			}
 		}
+
 		_encoder.save( callback );
 
 	}
@@ -955,12 +1005,24 @@ function CCapture( settings ) {
 
     }
 
+		function _getTiming() {
+
+			return {
+				framecount: _frameCount,
+				intermediateframecount: _intermediateFrameCount,
+				time: _time,
+				performancetime: _performanceTime
+			};
+	
+		}
+
 	return {
 		start: _start,
 		capture: _capture,
 		stop: _stop,
 		save: _save,
-        on: _on
+		on: _on,
+		getTiming: _getTiming
 	}
 }
 
