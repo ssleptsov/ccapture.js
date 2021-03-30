@@ -1,7 +1,5 @@
 {
   "devDependencies": {
-    "install": "^0.8.2",
-    "npm": "^4.0.3",
-    "uglify-js": "^2.7.5"
+    "uglify-js": "3.13.3"
   }
 }
